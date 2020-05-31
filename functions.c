@@ -1,13 +1,4 @@
-/* ---------------------------------------------------------------------------
-** This software is in the public domain, furnished "as is", without technical
-** support, and with no warranty, express or implied, as to its usefulness for
-** any purpose.
-**
-** functions.c
-** A library of helper functions for the verilog parser
-**
-** Author: David Kebo Houngninou
-** -------------------------------------------------------------------------*/
+
 #ifdef IDENT_C
 static const char* const functions_c_Id =
     "$Id$";
@@ -15,7 +6,20 @@ static const char* const functions_c_Id =
 
 #include "keywords.h"
 #include "functions.h"
+node_t * final_exp[99999];
 
+void initialize()
+{
+	node_t * pInt = NULL; 
+for (int i=0;i<99999;i++)
+{
+	//printf("%s",final_exp[i]->s); 
+   final_exp[i] = pInt;
+  // final_exp[i] = (node_t *) malloc(sizeof(node_t));
+  // strcpy(final_exp[i]->s,"00");
+  // final_exp[i]->next = NULL;
+}
+}
 /**
  * Determines if a string is reserved keyword
  * @param the string to compare
@@ -156,24 +160,24 @@ void print_module_summary (module m)
     int i;
     printf("\n************** Module %s statistical results *************\n", m->name);
     printf("Number of inputs: %d\n", m->inputcount);
-    for(i = 0; i < m->inputcount; i++)
-        printf("%s ", m->inputs[i]);
+    //for(i = 0; i < m->inputcount; i++)
+      //  printf("%s ", m->inputs[i]);
 
     printf("\n\nNumber of outputs: %d\n", m->outputcount);
-    for(i = 0; i < m->outputcount; i++)
-        printf("%s ", m->outputs[i]);
+    //for(i = 0; i < m->outputcount; i++)
+      //  printf("%s ", m->outputs[i]);
 
     printf("\n\nNumber of gates: %d\n", m->gatecount);
-    for(i = 0; i < m->gatecount; i++)
-        printf("%s ", m->gates[i]);
+    //for(i = 0; i < m->gatecount; i++)
+      //  printf("%s ", m->gates[i]);
 
     printf("\n\nNumber of wires: %d\n", m->wirecount);
-    for(i = 0; i < m->wirecount; i++)
-        printf("%s ", m->wires[i]);
+    //for(i = 0; i < m->wirecount; i++)
+      //  printf("%s ", m->wires[i]);
 
     printf("\n\nNumber of regs: %d\n", m->regcount);
-    for(i = 0; i < m->regcount; i++)
-        printf("%s ", m->regs[i]);
+    //for(i = 0; i < m->regcount; i++)
+      //  printf("%s ", m->regs[i]);
     printf("*************************** END **************************\n");
 }
 
@@ -200,29 +204,267 @@ void print_circuit_summary (circuit c)
     i=0;
 
     while (i<c->wirecount && c->wires[i] != NULL) {
-        printf ("c->wire[%d]->type: %s, ",i, c->wires[i]->type);
-        printf ("ID: %d,  ", c->wires[i]->id);
-        printf ("name: %s, ", c->wires[i]->name);
+        if(*(c->wires[i]->type) != 'I')
+        {
+            printf ("c->wire[%d]->type: %s, ",i, c->wires[i]->type);
+            printf ("ID: %d,  ", c->wires[i]->id);
+            printf ("name: %s, ", c->wires[i]->name);
 
-        printf ("\nInputs (%d): ", c->wires[i]->inputcount);/*Wire inputs*/
-        for(j=0; j<c->wires[i]->inputcount; j++)
-            printf ("%d ",c->wires[i]->inputs[j]);
+            printf ("\nInputs (%d): ", c->wires[i]->inputcount);/*Wire inputs*/
+            for(j=0; j<c->wires[i]->inputcount; j++)
+                printf ("%d ",c->wires[i]->inputs[j]);
 
-        printf ("\nOutputs (%d): ", c->wires[i]->outputcount);/*Wire outputs*/
-        for(j=0; j<c->wires[i]->outputcount; j++)
-            printf ("%d ",c->wires[i]->outputs[j]);
-
-        i++;
-        printf ("\n");
+            printf ("\nOutputs (%d): ", c->wires[i]->outputcount);/*Wire outputs*/
+            for(j=0; j<c->wires[i]->outputcount; j++)
+                printf ("%d ",c->wires[i]->outputs[j]);
+            printf ("\n");
+        }
+         i++;
+            
     }
     printf("*************************** END **************************\n");
 }
 
-/**
- * Get the id of a wire
- * @param the signal name, the circuit's name
- * The id of the wire
- */
+void form_dag(circuit c,module m)
+{
+   initialize();
+   FILE* write_file;
+   write_file = fopen("write_output", "w");     /* Open Verilog file */
+   fputs("Number of primary inputs:", write_file);
+   char str[10]; 
+   sprintf(str, "%d", m->inputcount); 
+   fputs(str,write_file);
+   fputs("\n",write_file);
+   fputs("Number of primary outputs:", write_file);
+   sprintf(str, "%d", m->outputcount); 
+   fputs(str,write_file);
+   fputs("\n",write_file);
+   int n = m->inputcount + m->outputcount + m->wirecount + m->gatecount;
+   int n_arc = 0;
+   int l = 0;
+   while (l<c->wirecount && c->wires[l] != NULL) {
+        if(*(c->wires[l]->type) != 'I')
+        {
+            n_arc = n_arc + c->wires[l]->inputcount + 1;
+        }
+         l++;
+            
+    }
+   const unsigned int size = n_arc; /* Arcs */
+   const unsigned int order = n; /* Vertices */
+    arc *arcs = malloc(size * sizeof(arc));
+    unsigned int i = 0;
+    unsigned int *sorted;
+    unsigned int acyclic;
+    int k,j;
+    k = 0;
+    while (k<c->wirecount && c->wires[k] != NULL) {
+        if(*(c->wires[k]->type) != 'I')
+        {
+            //printf ("c->wire[%d]->type: %s, \n",k, c->wires[k]->type);
+
+            for(j=0; j<c->wires[k]->inputcount; j++)
+            {
+                arc_connect(arcs,c->wires[k]->inputs[j],c->wires[k]->id,&i);
+               // printf ("%d %d %u\n",c->wires[k]->inputs[j],c->wires[k]->id, *&i);
+            }
+            arc_connect(arcs,c->wires[k]->id,c->wires[k]->outputs[0],&i);
+        }
+         k++;
+            
+    }
+ 
+    acyclic = topological_sort(arcs, size, order, &sorted);
+    printf("Graph is acyclic: %u\n", acyclic);
+    for (i = 0; i < order; i++) {
+        //printf("%d\n",sorted[i]);
+        if(sorted[i]<(n-(m->gatecount)));
+           // printf("-----------\n");
+    	else 
+    	{
+        form_expr(sorted[i],c);	
+    	}
+    }
+    for(int a=m->inputcount; a<(m->inputcount+m->outputcount);a++)
+    {
+    	printf("%d = ",a);
+        char str[10]; 
+        sprintf(str, "%d", a); 
+        fputs("O",write_file);
+        fputs(str,write_file);
+        fputs("=",write_file);
+    	list_print(final_exp[a],write_file);
+        fputs("\n",write_file);
+    	printf("\n");
+    }
+    putchar('\n');
+ 
+    free(sorted);
+    free(arcs); 
+}
+
+void form_expr(unsigned int id,circuit c)
+{
+	wire w;
+	w = getWire(id,c);
+    final_exp[w->outputs[0]] = malloc(sizeof(node_t));
+    strcpy(final_exp[w->outputs[0]]->s,"(");
+    final_exp[w->outputs[0]]->next = NULL;
+    if(w->inputcount == 1)
+    { 
+      push(final_exp[w->outputs[0]],w->type);
+      push(final_exp[w->outputs[0]],"(");
+      if(final_exp[w->inputs[0]] == NULL)
+     // if(!(strcmp(final_exp[w->inputs[0]]->s,"00")))
+            	{
+                    char s[10];
+                    sprintf(s,"%d",w->inputs[0]);
+            		push(final_exp[w->outputs[0]],s);
+
+            	}
+            	else
+                {
+                node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[0]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+                while(current_out->next != NULL) {
+                     current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+                }
+                push(final_exp[w->outputs[0]],")");
+        }
+    else
+    {
+     int f = (w->inputcount) - 1;   //
+     //printf("f %d\n",f);
+     int j = 0;
+    for(j=0; j<f+1; j++)
+            {
+                if(final_exp[w->inputs[j]] == NULL)
+            	{
+                    char s[10];
+                    sprintf(s,"%d",w->inputs[j]);
+            		 push(final_exp[w->outputs[0]],s);
+            	}
+                else
+                {
+                node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[j]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+                }
+                if(j != f)
+            	push(final_exp[w->outputs[0]],w->type);	
+            }
+    }
+    push(final_exp[w->outputs[0]],")");
+    //printf("final");
+    //list_print(final_exp[w->outputs[0]]);
+    //printf("\n");
+    return;
+}
+
+void concatenate(node_t *a,node_t *b)
+{
+    if(a != NULL && b != NULL)
+    {
+        if(a->next == NULL)
+            a->next = b;
+        else
+            concatenate(a->next,b); 
+    }
+}
+
+
+void push(node_t * head, char *str) {
+    node_t * current = head;
+    while (current->next != NULL) {
+        current = current->next;
+    }
+    
+    /* now we can add a new variable */
+
+    current->next = malloc(sizeof(node_t));
+    strcpy(current->next->s,str);
+    
+    current->next->next = NULL;
+}
+
+void list_print(node_t * head, FILE* fptr) {
+    node_t * current = head;
+
+    while (current != NULL) {
+        printf("%s ", current->s);
+        if(!strcmp(current->s,"(") || !strcmp(current->s,"(") || !strcmp(current->s,")") || !strcmp(current->s,"&") || !strcmp(current->s,"~&") || !strcmp(current->s,"|") || !strcmp(current->s,"~|") || !strcmp(current->s,"buf") || !strcmp(current->s,"^") || !strcmp(current->s,"~^") || !strcmp(current->s,"~"))
+        fputs(current->s,fptr);
+        else
+        {
+           fputs("I",fptr);
+           fputs(current->s,fptr);
+        }
+        current = current->next;
+    }
+}
+
+
+void form_bool (circuit c)
+{
+    char out_bool[c->outputcount][LINESIZE];
+    int i=0;
+    while (i<c->wirecount && c->wires[i] != NULL) {
+        if(*(c->wires[i]->type) != 'I')
+        {
+            if(c->wires[i]->outputs[0] >= (c->inputcount + c->outputcount));
+            printf ("c->wire[%d]->type: %s, ",i, c->wires[i]->type);
+            printf ("ID: %d,  ", c->wires[i]->id);
+            printf ("name: %s, ", c->wires[i]->name);
+
+            printf ("\nInputs (%d): ", c->wires[i]->inputcount);/*Wire inputs*/
+            for(int j=0; j<c->wires[i]->inputcount; j++)
+                printf ("%d ",c->wires[i]->inputs[j]);
+
+            printf ("\nOutputs (%d): ", c->wires[i]->outputcount);/*Wire outputs*/
+            for(int j=0; j<c->wires[i]->outputcount; j++)
+                printf ("%d ",c->wires[i]->outputs[j]);
+            printf ("\n");
+        }
+         i++;
+            
+    }
+}
+
+
 int getID (char* name, circuit c)
 {
     int i;
@@ -276,6 +518,15 @@ void setNode ( node n, char* type, char* name, int id)
     n->id = id;			/*Store node id*/
 }
 
+/*void setNode ( node n, char* type, char* name, int id)
+{
+	if(!strcmp("and",type))
+	{
+      strcpy(n->type, "&");
+	}
+    strcpy(n->name, name);
+    n->id = id;			/*Store node id*/
+//}
 
 /**
  * Create a wire
@@ -285,6 +536,38 @@ void build_wire (circuit c, wire w, char* type, char* name)
 {
     int i;
     w->id = getID (name, c);   /*Wire ID*/
+    if(!strcmp("and",type))
+	{
+      strcpy(type, "&");	
+	}
+	else if(!strcmp("nand",type))
+	{
+      strcpy(type, "~&");
+	}
+	else if(!strcmp("or",type))
+	{
+      strcpy(type, "|");
+	}
+	else if(!strcmp("nor",type))
+	{
+      strcpy(type, "~|");
+	}
+	else if(!strcmp("xor",type))
+	{
+      strcpy(type, "^");
+    }
+	else if(!strcmp("xnor",type))
+	{
+      strcpy(type, "~^");
+	}
+	else if(!strcmp("buf",type))
+	{
+      strcpy(type, "buf");
+	}
+	else if(!strcmp("not",type))
+	{
+      strcpy(type, "~");
+	}
     w->type = strdup(type);		/*Wire type*/
     w->name = strdup(name);		/*Wire name*/
     w->inputcount = 0;			/*Initial number of inputs*/
@@ -296,7 +579,7 @@ void build_wire (circuit c, wire w, char* type, char* name)
         }
     }
 
-    printf("Creating wire: %s, id: %d\n", w->name, w->id);
+   // printf("Creating wire: %s, id: %d\n", w->name, w->id);
 }
 
 /**
@@ -314,3 +597,85 @@ bool defined (circuit c, char* name)
     }
     return false;
 }
+
+static unsigned int is_root(const arc *graph, const unsigned int *arcs, unsigned int size,
+        unsigned int v)
+{
+    unsigned int a, root = 1;
+    for (a = 0; a < size && root; a++) {
+        root = !arcs[a] || graph[a].second != v;
+    }
+    return root;
+}
+ 
+/* Get the vertices with no incoming arcs */
+static unsigned int get_roots(const arc *graph, const unsigned int *arcs, unsigned int size,
+        unsigned int order, unsigned int *vertices)
+{
+    unsigned int v, vertices_size = 0;
+    for (v = 0; v < order; v++) {
+        if (is_root(graph, arcs, size, v)) {
+            vertices[v] = 1;
+            vertices_size++;
+        }
+    }
+    return vertices_size;
+}
+
+unsigned int topological_sort(const arc *graph, unsigned int size, unsigned int order, 
+        unsigned int **sorted)
+{
+    unsigned int *vertices = calloc(order, sizeof(unsigned int));
+    unsigned int *arcs = malloc(size * sizeof(unsigned int));
+    *sorted = malloc(order * sizeof(unsigned int));
+    unsigned int v, a, vertices_size, sorted_size = 0,
+            arcs_size = size;
+    if (!(vertices && arcs && *sorted)) {
+        free(vertices);
+        free(arcs);
+        free(*sorted);
+        *sorted = NULL;
+        return 0;
+    }
+    /* All arcs start off in the graph */
+    for (a = 0; a < size; a++) {
+        arcs[a] = 1;
+    }
+    /* Get the vertices with no incoming edges */
+    vertices_size = get_roots(graph, arcs, size, order, vertices);
+    /* Main loop */
+    while (vertices_size > 0) {
+        /* Get first vertex */
+        for (v = 0; vertices[v] != 1; v++);
+        /* Remove from vertex set */
+        vertices[v] = 0;
+        vertices_size--;
+        /* Add it to the sorted array */
+        (*sorted)[sorted_size++] = v;
+        /* Remove all arcs connecting it to its neighbours */
+        for (a = 0; a < size; a++) {
+            if (arcs[a] && graph[a].first == v) {
+                arcs[a] = 0;
+                arcs_size--;
+                /* Check if neighbour is now a root */
+                if (is_root(graph, arcs, size, graph[a].second)) {
+                    /* Add it to set of vertices */
+                    vertices[graph[a].second] = 1;
+                    vertices_size++;
+                } 
+            }
+        }
+    }
+    free(vertices);
+    free(arcs);
+    return arcs_size == 0;
+}
+
+void arc_connect(arc *arcs, unsigned int first, unsigned int second,
+        unsigned int *pos)
+{
+    arcs[*pos].first = first;
+    arcs[*pos].second = second;
+    (*pos)++;
+}
+

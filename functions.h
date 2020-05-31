@@ -1,13 +1,4 @@
-// ---------------------------------------------------------------------------
-// This software is in the public domain, furnished "as is", without technical
-// support, and with no warranty, express or implied, as to its usefulness for
-// any purpose.
-//
-// functions.H
-// A library of helper functions for the verilog parser
-//
-// Author: David Kebo Houngninou
-// ---------------------------------------------------------------------------
+
 #ifndef _functions_H
 #define _functions_H
 
@@ -27,19 +18,18 @@ static const char* const functions_H_Id =
 #define BUFSIZE 99999	/* Maximum length of a buffer.*/
 #define SIZE 9999
 #define INPUT	0
-#define AND	1
-#define NAND	2
-#define OR	3
-#define NOR	4
-#define XOR	5
-#define XNOR	6
-#define BUF	7
-#define NOT	8
-#define INV	8
-#define I	9
+#define AND	"&"
+#define NAND "~&"
+#define OR	"|"
+#define NOR	"~|"
+#define XOR	"^"
+#define XNOR "~^"
+#define BUF	"B"
+#define NOT	"~"
+#define INV	"-"
+#define I	"I"
 #define	RESERVEDNUM 107
 #define	NO_OUT 0
-
 typedef enum { false, true } bool;
 typedef char * string;
 
@@ -84,6 +74,17 @@ struct module_  {
 };
 typedef struct module_ *module;
 
+typedef struct {
+    unsigned int first;
+    unsigned int second;
+} arc;
+
+typedef struct node {
+    char s[LINESIZE];
+    struct node * next;
+} node_t;
+
+
 /*PROTOTYPES*/
 bool reserved (char* word);
 bool gate (char* word);
@@ -94,6 +95,7 @@ bool end_of_module (char* word);
 bool end_of_line(char* source);
 int convert (char* gate);
 void print_module_summary (module m);
+void form_bool (circuit c);
 void print_circuit_summary (circuit c);
 int getID(char* name, circuit c);
 void setNode ( node n, char* type, char* name, int number);
@@ -103,6 +105,20 @@ wire getWireByName (char* name, circuit c);
 bool defined (circuit c, char* name);
 int get_max (int value1, int value2);
 bool defined (circuit c, char* name);
+static unsigned int is_root(const arc *graph, const unsigned int *arcs, unsigned int size,
+        unsigned int v);
+static unsigned int get_roots(const arc *graph, const unsigned int *arcs, unsigned int size,
+        unsigned int order, unsigned int *vertices);
+unsigned int topological_sort(const arc *graph, unsigned int size, unsigned int order, 
+        unsigned int **sorted);
+void arc_connect(arc *arcs, unsigned int first, unsigned int second,
+        unsigned int *pos);
+void form_dag(circuit c,module m);
+void form_expr(unsigned int id,circuit c);
+void push(node_t * head, char *str);
+void list_print(node_t * head,FILE* fptr);
+void initialize();
+void concatenate(node_t *a,node_t *b);
 /*END PROTOTYPES*/
 
 #endif

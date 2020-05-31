@@ -1,0 +1,4 @@
+Number of primary inputs:5
+Number of primary outputs:2
+O5=(buf(((I0&I1&I4)|(I2&I3))))
+O6=(~(((I0&I1&I4)|(I2&I3))))

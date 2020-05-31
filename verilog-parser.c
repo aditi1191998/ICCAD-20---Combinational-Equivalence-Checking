@@ -1,13 +1,4 @@
-/* ---------------------------------------------------------------------------
-** This software is in the public domain, furnished "as is", without technical
-** support, and with no warranty, express or implied, as to its usefulness for
-** any purpose.
-**
-** verilog-parser.c
-** A verilog parser for multi-level combinational logic circuits
-**
-** Author: David Kebo Houngninou
-** -------------------------------------------------------------------------*/
+
 #ifdef IDENT_C
 static const char* const <verilog_parser>_c_Id =
     "$Id$";
@@ -81,7 +72,7 @@ void build_module_circuit (FILE *verilog, module m, circuit c)
         in=0;
         memset (buffer,0,sizeof(char) * BUFSIZE);				/*Clear the buffer*/
         strcpy (tmpbuf,linebuf);
-        token[0] = strtok(tmpbuf, " [()],;"); 		/*Get 1st keyword from the line*/
+        token[0] = strtok(tmpbuf, " (),;"); 		/*Get 1st keyword from the line*/
         keyword = trim(token[0]);
 
         if (!reserved (keyword)) continue;		/*Skip any comment lines, empty lines or spaces*/
@@ -95,15 +86,15 @@ void build_module_circuit (FILE *verilog, module m, circuit c)
                 strcat (buffer,linebuf);
         }
 
-        token[0] = strtok(buffer, " [()],;"); 		/*Tokenize the line to extract data*/
+        token[0] = strtok(buffer, " (),;"); 		/*Tokenize the line to extract data*/
         while(token[i]!= NULL) {
             i++;
-            token[i] = strtok(NULL, " [()],;\r\n");
+            token[i] = strtok(NULL, " (),;\r\n");
         }
 
 
         /*A. Create wires for all the gate inputs*/
-        for(j = 2; j < i-1; j++) {
+        for(j = 3; j < i; j++) {
             if (!defined (c,token[j])) { /*If wire is not already defined*/
                 c->wires[index] = (wire)calloc(1,sizeof(struct wire_));
                 build_wire (c, c->wires[index], "I", token[j]);
@@ -118,28 +109,29 @@ void build_module_circuit (FILE *verilog, module m, circuit c)
         build_wire (c, c->wires[index], keyword, token[1]);
         /*B1. Assign the gate inputs*/
         in = 0;
-        for(j = 2; j < i-1; j++) {
+        for(j = 3; j < i; j++) {
             c->wires[index]->inputs[in] = getID (token[j], c);
             c->wires[index]->inputcount++;
             in++;
         }
         /*B2. Assign the gate output*/
-        c->wires[index]->outputs[0] = getID (token[i-1], c);
+        c->wires[index]->outputs[0] = getID (token[2], c);
         c->wires[index]->outputcount = 1;
         index++;
 
         /*C. Create wires for the gate output*/
-        if (!defined (c,token[i-1])) { /*If wire is not already defined*/
+        if (!defined (c,token[2])) { /*If wire is not already defined*/
             c->wires[index] = (wire)calloc(1,sizeof(struct wire_));
-            build_wire (c, c->wires[index], "I", token[i-1]);
+            build_wire (c, c->wires[index], "I", token[2]);
             c->wires[index]->inputs[0] = getID (token[1], c);/*1/29/15 assign in to I wires*/
             c->wires[index]->inputcount = 1;
             index++;
         }
 
         else { /*If wire is already defined*/
-            getWireByName(token[i-1],c)->inputs[0] = getID (token[1], c);/*Find the wire and attach an input to it (10/30/2015) */
-            getWireByName(token[i-1],c)->inputcount = 1;
+            getWireByName(token[2],c)->inputs[0] = getID (token[1], c);/*Find the wire and attach an input to it (10/30/2015) */
+            getWireByName(token[2
+            	],c)->inputcount = 1;
         }
 
         memset(linebuf, 0, sizeof(char) * LINESIZE);
@@ -192,7 +184,7 @@ void build_module (FILE *verilog, module m)
         i=0;
         strcpy (buffer,"");				/*Clear the buffer*/
         strcpy (tmpbuf,linebuf);
-        token[0] = strtok(tmpbuf, " [()],;"); 		/*Get 1st keyword from the line*/
+        token[0] = strtok(tmpbuf, " (),;"); 		/*Get 1st keyword from the line*/
         keyword = trim(token[0]);
         if (!reserved (keyword)) continue;		/*skip comment lines, empty lines or spaces*/
 
@@ -203,10 +195,10 @@ void build_module (FILE *verilog, module m)
                 strcat (buffer,linebuf);
         }
 
-        token[0] = strtok(buffer, " [()],;"); 		/*Tokenize the line to extract data*/
+        token[0] = strtok(buffer, " (),;"); 		/*Tokenize the line to extract data*/
         while(token[i]!= NULL) {
             i++;
-            token[i] = strtok(NULL, " [()],;\r\n");
+            token[i] = strtok(NULL, " (),;\r\n");
         }
 
         if (strcmp(keyword, "module")==0) {		/*MODULES*/
@@ -295,7 +287,7 @@ void parse_verilog_file (circuit c, char *filename)
     build_module (verilog, m);			/*Create module object*/
     rewind(verilog);				/*Sets the stream position indicator to the beginning of verilog file.*/
     build_module_circuit (verilog, m, c); 	/*Create circuit object using the module*/
-
+    form_dag (c, m);
     /*Free Memory*/
 
     for (i = 0; i < m->outputcount; i++)
@@ -334,8 +326,8 @@ int main (int argc, char *argv[])
     c->name = strdup(argv[1]); 				/*Set circuit name*/
 
     parse_verilog_file (c, c->name);	 	/*Parse the verilog file */
-
-    print_circuit_summary (c);			/*Print summary of the circuit */
+    
+    //print_circuit_summary (c);			/*Print summary of the circuit */
 
     /*Free memory*/
     for (i=0; i < c->outputcount; i++)
