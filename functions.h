@@ -28,7 +28,7 @@ static const char* const functions_H_Id =
 #define NOT	"~"
 #define INV	"-"
 #define I	"I"
-#define	RESERVEDNUM 107
+#define	RESERVEDNUM 109
 #define	NO_OUT 0
 typedef enum { false, true } bool;
 typedef char * string;
@@ -114,11 +114,13 @@ unsigned int topological_sort(const arc *graph, unsigned int size, unsigned int 
 void arc_connect(arc *arcs, unsigned int first, unsigned int second,
         unsigned int *pos);
 void form_dag(circuit c,module m);
-void form_expr(unsigned int id,circuit c);
+void form_expr(unsigned int id,circuit c,int n);
 void push(node_t * head, char *str);
 void list_print(node_t * head,FILE* fptr);
-void initialize();
+void initialize(int n);
 void concatenate(node_t *a,node_t *b);
+void output_print(module m, FILE* fptr);
+void dc_case(module m, FILE * fptr,unsigned int **sorted,circuit c,int order,int index);
 /*END PROTOTYPES*/
 
 #endif

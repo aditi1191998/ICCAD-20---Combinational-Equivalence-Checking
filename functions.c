@@ -8,10 +8,10 @@ static const char* const functions_c_Id =
 #include "functions.h"
 node_t * final_exp[99999];
 
-void initialize()
+void initialize(int n)
 {
 	node_t * pInt = NULL; 
-for (int i=0;i<99999;i++)
+for (int i=n;i<99999;i++)
 {
 	//printf("%s",final_exp[i]->s); 
    final_exp[i] = pInt;
@@ -147,8 +147,12 @@ int convert (char* gate)
         return 8;
     else if (strcasecmp(gate, "I")==0)
         return 9;
-    else
+    else if (strcasecmp(gate, "_HMUX")==0)
         return 10;
+    else if (strcasecmp(gate, "_DC")==0)
+        return 11;
+    else
+        return 12;
 }
 
 /**
@@ -227,7 +231,7 @@ void print_circuit_summary (circuit c)
 
 void form_dag(circuit c,module m)
 {
-   initialize();
+   initialize(0);
    FILE* write_file;
    write_file = fopen("write_output", "w");     /* Open Verilog file */
    fputs("Number of primary inputs:", write_file);
@@ -276,7 +280,8 @@ void form_dag(circuit c,module m)
  
     acyclic = topological_sort(arcs, size, order, &sorted);
     printf("Graph is acyclic: %u\n", acyclic);
-    for (i = 0; i < order; i++) {
+   dc_case(m,write_file,&sorted,c,order,-1);
+    /*for (i = 0; i < order; i++) {
         //printf("%d\n",sorted[i]);
         if(sorted[i]<(n-(m->gatecount)));
            // printf("-----------\n");
@@ -285,7 +290,8 @@ void form_dag(circuit c,module m)
         form_expr(sorted[i],c);	
     	}
     }
-    for(int a=m->inputcount; a<(m->inputcount+m->outputcount);a++)
+  output_print(m,write_file);*/
+   /*for(int a=m->inputcount; a<(m->inputcount+m->outputcount);a++)
     {
     	printf("%d = ",a);
         char str[10]; 
@@ -297,13 +303,66 @@ void form_dag(circuit c,module m)
         fputs("\n",write_file);
     	printf("\n");
     }
-    putchar('\n');
+    putchar('\n');*/
  
     free(sorted);
     free(arcs); 
 }
+void dc_case(module m, FILE * fptr,unsigned int **sorted,circuit c,int order,int index)
+{
+    initialize(index+1);
+    //printf("enter\n");
+    int n = m->inputcount + m->outputcount + m->wirecount + m->gatecount;
+    for (int i = index+1; i < order; i++) {
+        //printf("%d\n",sorted[i]);
+        if((*sorted)[i]<(n-(m->gatecount)));
+           // printf("-----------\n");
+        else 
+        {
+        wire w;
+        w = getWire((*sorted)[i],c);
 
-void form_expr(unsigned int id,circuit c)
+        if(!strcmp(w->type,"dc")) 
+        {
+            //printf("%d\n",i);
+            form_expr((*sorted)[i],c,1); 
+            dc_case(m,fptr,&(*sorted),c,order,i);
+            form_expr((*sorted)[i],c,2); 
+            dc_case(m,fptr,&(*sorted),c,order,i);
+            form_expr((*sorted)[i],c,3); 
+            dc_case(m,fptr,&(*sorted),c,order,i);
+            form_expr((*sorted)[i],c,4); 
+            dc_case(m,fptr,&(*sorted),c,order,i);
+            return;
+        }
+        else
+        {
+        //printf("enter 1 %d\n",(*sorted)[i]);
+        form_expr((*sorted)[i],c,0); 
+        }
+        }
+    }
+    output_print(m,fptr);
+
+}
+void output_print(module m, FILE* fptr)
+{
+for(int a=m->inputcount; a<(m->inputcount+m->outputcount);a++)
+    {
+        printf("%d = ",a);
+        char str[10]; 
+        sprintf(str, "%d", a); 
+        fputs("O",fptr);
+        fputs(str,fptr);
+        fputs("=",fptr);
+        list_print(final_exp[a],fptr);
+        fputs("\n",fptr);
+        printf("\n");
+    }
+    putchar('\n');
+}
+
+void form_expr(unsigned int id,circuit c,int dc_n)
 {
 	wire w;
 	w = getWire(id,c);
@@ -347,6 +406,417 @@ void form_expr(unsigned int id,circuit c)
                 }
                 push(final_exp[w->outputs[0]],")");
         }
+        else if(!strcmp(w->type,"mux"))
+        {
+            push(final_exp[w->outputs[0]],"(");
+            int j = 0;
+            if(final_exp[w->inputs[0]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[j]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[0]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],"&"); 
+            push(final_exp[w->outputs[0]],"(");
+            push(final_exp[w->outputs[0]],"~");  
+            if(final_exp[w->inputs[2]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[2]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[2]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],"))"); 
+            push(final_exp[w->outputs[0]],"|"); 
+            push(final_exp[w->outputs[0]],"(");
+            if(final_exp[w->inputs[1]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[1]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[1]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],"&");
+
+            if(final_exp[w->inputs[2]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[2]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[2]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],")");
+        }
+
+        else if(!strcmp(w->type,"dc"))
+        {
+            if(dc_n == 1)
+            {
+             push(final_exp[w->outputs[0]],"(");
+            int j = 0;
+            if(final_exp[w->inputs[0]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[j]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[0]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],"&"); 
+            push(final_exp[w->outputs[0]],"(");
+            push(final_exp[w->outputs[0]],"~");  
+            if(final_exp[w->inputs[1]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[1]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[1]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],"))"); 
+            push(final_exp[w->outputs[0]],"|"); 
+            //push(final_exp[w->outputs[0]],"(");
+            if(final_exp[w->inputs[1]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[1]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[1]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],")");
+            }
+            else if(dc_n == 2)
+            {
+              //push(final_exp[w->outputs[0]],"(");
+            int j = 0;
+            if(final_exp[w->inputs[0]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[j]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[0]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],"&"); 
+            push(final_exp[w->outputs[0]],"(");
+            push(final_exp[w->outputs[0]],"~");  
+            if(final_exp[w->inputs[1]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[1]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[1]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],")"); 
+            }
+            else if(dc_n == 3)
+            {
+              //push(final_exp[w->outputs[0]],"(");
+            int j = 0;
+            if(final_exp[w->inputs[0]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[j]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[0]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            push(final_exp[w->outputs[0]],"^");  
+            if(final_exp[w->inputs[1]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[1]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[1]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            //push(final_exp[w->outputs[0]],"))"); 
+            }
+            else
+            {
+                          int j = 0;
+            if(final_exp[w->inputs[0]] == NULL)
+            {
+                char s[10];
+                sprintf(s,"%d",w->inputs[j]);
+                push(final_exp[w->outputs[0]],s);
+            }
+            else
+            {
+               node_t *newHead = malloc(sizeof(node_t));
+                node_t *current;
+                node_t *current_out;
+                current = final_exp[w->inputs[0]];
+                current_out = final_exp[w->outputs[0]];
+                strcpy(newHead->s, current->s);
+               while(current_out->next != NULL) {
+                 //   printf("kkkkkkk");
+                       current_out = current_out->next;
+                }
+                current_out->next = newHead;
+// Part 3 - the rest of the list
+                node_t *p = newHead;
+                current = current->next;
+                while(current != NULL) {
+                    p->next = malloc(sizeof(node_t));
+                        p=p->next;
+                        strcpy(p->s, current->s);
+                       current = current->next;
+                }
+                p->next = NULL; 
+            }
+            }
+        }
+    
     else
     {
      int f = (w->inputcount) - 1;   //
@@ -568,6 +1038,14 @@ void build_wire (circuit c, wire w, char* type, char* name)
 	{
       strcpy(type, "~");
 	}
+    else if(!strcmp("_HMUX",type))
+    {
+      strcpy(type, "mux");
+    }
+    else if(!strcmp("_DC",type))
+    {
+      strcpy(type, "dc");
+    }
     w->type = strdup(type);		/*Wire type*/
     w->name = strdup(name);		/*Wire name*/
     w->inputcount = 0;			/*Initial number of inputs*/

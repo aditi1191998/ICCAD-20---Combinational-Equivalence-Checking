@@ -7,7 +7,7 @@ static const char* const keywords_h_Id =
     "$Id$";
 #endif
 
-#define	GATESNUM 18
+#define	GATESNUM 20
 char* gate_name[] = {
     "and",
     "nand",
@@ -26,7 +26,9 @@ char* gate_name[] = {
     "fo3",
     "fo4",
     "fi",
-    "inv"
+    "inv",
+    "_HMUX",
+    "_DC"
 };
 
 char* reserved_word[] = {	/*Reserved Verilog keywords*/
@@ -136,7 +138,9 @@ char* reserved_word[] = {	/*Reserved Verilog keywords*/
     "fo3",
     "fo4",
     "fi",
-    "inv"
+    "inv",
+    "_HMUX",
+    "_DC"
 };
 
 #define NUM_PUNCTUATIONS 4

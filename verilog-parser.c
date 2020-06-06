@@ -78,18 +78,21 @@ void build_module_circuit (FILE *verilog, module m, circuit c)
         if (!reserved (keyword)) continue;		/*Skip any comment lines, empty lines or spaces*/
         if (end_of_module (linebuf)) break;		/*If end of module is reached then break*/
         if (!gate (keyword)) continue;			/*Skip everything but gates*/
-
+       
         strcat (buffer,linebuf);
-
+        
         while (!end_of_line(linebuf)) {			/*Check if the line ends with a ';' character (Multiple lines statement)*/
             if (fgets(linebuf,LINESIZE,verilog) != NULL)	/*Otherwise, append all the following lines until ';' is found*/
                 strcat (buffer,linebuf);
         }
-
+         
         token[0] = strtok(buffer, " (),;"); 		/*Tokenize the line to extract data*/
+       // printf("debug1 %s\n",token[0]);
+        //printf("i = %d",i);
         while(token[i]!= NULL) {
             i++;
             token[i] = strtok(NULL, " (),;\r\n");
+           // printf("%s ",token[i]);
         }
 
 
