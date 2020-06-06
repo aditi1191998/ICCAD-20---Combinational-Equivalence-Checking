@@ -229,11 +229,15 @@ void print_circuit_summary (circuit c)
     printf("*************************** END **************************\n");
 }
 
-void form_dag(circuit c,module m)
+void form_dag(circuit c,module m,FILE * write_file)
 {
    initialize(0);
-   FILE* write_file;
-   write_file = fopen("write_output", "w");     /* Open Verilog file */
+ /*  FILE* write_file;
+   write_file = fopen("write_output", "w");   
+       if (!write_file) {
+        fprintf(stderr,"transfer:  cannot open file \"%s\"\n","write_output");
+        exit(1);
+    }*/
    fputs("Number of primary inputs:", write_file);
    char str[10]; 
    sprintf(str, "%d", m->inputcount); 

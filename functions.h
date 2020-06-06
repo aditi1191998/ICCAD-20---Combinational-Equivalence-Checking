@@ -113,7 +113,7 @@ unsigned int topological_sort(const arc *graph, unsigned int size, unsigned int 
         unsigned int **sorted);
 void arc_connect(arc *arcs, unsigned int first, unsigned int second,
         unsigned int *pos);
-void form_dag(circuit c,module m);
+void form_dag(circuit c,module m,FILE * write_file);
 void form_expr(unsigned int id,circuit c,int n);
 void push(node_t * head, char *str);
 void list_print(node_t * head,FILE* fptr);

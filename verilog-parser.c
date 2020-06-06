@@ -272,11 +272,80 @@ void build_module (FILE *verilog, module m)
 
 } /*end build_modules*/
 
+void build_module_new (FILE *verilog, module m)
+{
+    int i=0, j=0;                       /*Indexes*/
+    char linebuf[LINESIZE], tmpbuf[LINESIZE], buffer[BUFSIZE];  /*Buffer for lines of the verilog code*/
+    char *token[TOKENSIZE];                     /*Array to hold tokens for the line*/
+    char *keyword;                      /*Keyword from verilog line*/
+
+    /*Make first pass to count primary inputs, primary outputs, and wires.*/
+    while (fgets(linebuf,LINESIZE,verilog) != NULL) {
+        i=0;
+        strcpy (buffer,"");             /*Clear the buffer*/
+        strcpy (tmpbuf,linebuf);
+        token[0] = strtok(tmpbuf, " (),;");         /*Get 1st keyword from the line*/
+        keyword = trim(token[0]);
+        if (!reserved (keyword)) continue;      /*skip comment lines, empty lines or spaces*/
+
+        strcat (buffer,linebuf);
+        while (!end_of_line(linebuf)) {         /*Check if the line ends with a ';' character (Multiple lines statement)*/
+            if (end_of_module (linebuf)) break;     /*If end of module*/
+            if (fgets(linebuf,LINESIZE,verilog) != NULL)    /*Otherwise, append all the following lines*/
+                strcat (buffer,linebuf);
+        }
+
+        token[0] = strtok(buffer, " (),;");         /*Tokenize the line to extract data*/
+        while(token[i]!= NULL) {
+            i++;
+            token[i] = strtok(NULL, " (),;\r\n");
+        }
+
+        if (strcmp(keyword, "wire")==0) {      /*WIRES*/
+            for(j = 1; j < i; j++) {            /*Parse all the words in the line*/
+                if (signal_vector(token[j]))        /*Handle a vector of signals*/
+                    parse_signal_vector (m->wires, token, &j, &m->wirecount);
+                else {                              /*Not a vector of signal*/
+                    m->wires [m->wirecount] = calloc (strlen(token[j]) + 1, sizeof(char));  /*Allocating memory for wire string*/
+                    strcpy (m->wires [m->wirecount],token[j]);          /*Add the wire name to the array of wires*/
+                    m->wirecount ++;                        /*Update the number of wires in the circuit*/
+                }
+            }
+        }
+
+        else if (strcmp(keyword, "reg")==0) {       /*REGS*/
+            for(j = 1; j < i; j++) {            /*Parse all the words in the line*/
+                if (signal_vector(token[j]))        /*Handle a vector of signals*/
+                    parse_signal_vector (m->regs, token, &j, &m->regcount);
+                else {                          /*Not a vector of signal*/
+                    m->regs [m->regcount] = calloc (strlen(token[j]) + 1, sizeof(char));    /*Allocating memory for reg string*/
+                    strcpy (m->regs [m->regcount],token[j]);        /*Add the reg name to the array of regs*/
+                    m->regcount ++;                 /*Update the number of regs in the circuit*/
+                }
+            }
+        }
+
+        else if (gate (keyword)) {          /*GATES*/
+            m->gates[m->gatecount] = calloc (strlen(token[1]) + 1, sizeof(char)); /*Allocating memory for module name string*/
+            strcpy (m->gates [m->gatecount], token[1]);     /*Add the module name to the array of modules*/
+            m->gatecount ++;                    /*Update the number of modules in the circuit*/
+        }
+
+        else if (end_of_module (linebuf))       /*END OF MODULE*/
+        {
+            print_module_summary(m);            /*Print summary of the module*/
+            break;                  /*End of the module; break*/
+        }
+    } // end while
+
+}
+
+
 /**
  * Parses a verilog file and create a circuit object using the module
  * @param the circuit object, the file name
  */
-void parse_verilog_file (circuit c, char *filename)
+void parse_verilog_file (circuit c, char *filename,char *filename_new)
 {
     FILE *verilog; 			/* Verilog file */
     int i = 0;
@@ -285,13 +354,59 @@ void parse_verilog_file (circuit c, char *filename)
         fprintf(stderr,"transfer:  cannot open file \"%s\"\n",filename);
         exit(1);
     }
+    FILE* write_file;
+    write_file = fopen("write_output", "w");   
+       if (!write_file) {
+        fprintf(stderr,"transfer:  cannot open file \"%s\"\n","write_output");
+        exit(1);
+    }
 
     module m = (module)calloc(1, sizeof(struct module_));	/*Declare an instance of a module*/
     build_module (verilog, m);			/*Create module object*/
     rewind(verilog);				/*Sets the stream position indicator to the beginning of verilog file.*/
     build_module_circuit (verilog, m, c); 	/*Create circuit object using the module*/
-    form_dag (c, m);
+    form_dag (c, m,write_file);
+    
+    for (i = 0; i < m->wirecount; i++)
+        free (m->wires[i]);
+
+    for (i = 0; i < m->gatecount; i++)
+        free (m->gates[i]);
+    for (i=0; i < c->outputcount; i++)
+        free (c->outputs[i]);
+
+    for (i=0; i < c->inputcount; i++)
+        free (c->inputs[i]);
+
+    for (i=0; i < c->nodecount; i++)
+        free (c->nodes[i]);
+    free(c->nodes);
+
+    for (i=0; i < c->wirecount; i++) {
+        free (c->wires[i]->name);
+        free (c->wires[i]->type);
+        free (c->wires[i]);
+    }
+    free(c->wires);
+
+    m->wirecount = 0;
+    m->regcount = 0;
+    m->gatecount = 0;
+
+    FILE *verilog_new;          /* Verilog file */
+    i = 0;
+    verilog_new = fopen(filename_new, "r");     /* Open Verilog file */
+    if (!verilog_new) {
+        fprintf(stderr,"transfer:  cannot open file \"%s\"\n",filename_new);
+        exit(1);
+    }
+    build_module_new (verilog_new,m);
+    rewind(verilog_new);
+    build_module_circuit (verilog_new, m, c);
+    form_dag(c, m,write_file); 
+
     /*Free Memory*/
+
 
     for (i = 0; i < m->outputcount; i++)
         free (m->outputs[i]);
@@ -309,6 +424,7 @@ void parse_verilog_file (circuit c, char *filename)
     free (m); /*Free module memory*/
 
     fclose(verilog);
+    fclose(verilog_new);
 
     /*End Free Memory*/
 }
@@ -320,15 +436,19 @@ void parse_verilog_file (circuit c, char *filename)
 int main (int argc, char *argv[])
 {
     int i;
-    if (argc != 2) {
-        printf("Usage: ./verilog-parser <verilog_file.v>\n"); /* Check for a verilog input file */
+    if (argc != 3) {
+        printf("Usage: ./verilog-parser <verilog_file1.v> <verilog_file2.v> \n"); /* Check for a verilog input file */
         exit(1);
     }
     circuit c = (circuit)calloc(1,sizeof(struct circuit_));	/*Declare an instance of a circuit */
 
     c->name = strdup(argv[1]); 				/*Set circuit name*/
 
-    parse_verilog_file (c, c->name);	 	/*Parse the verilog file */
+    parse_verilog_file (c, c->name, argv[2]);	 	/*Parse the verilog file */
+
+
+
+
     
     //print_circuit_summary (c);			/*Print summary of the circuit */
 
