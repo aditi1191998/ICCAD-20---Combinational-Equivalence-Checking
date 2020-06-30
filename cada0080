@@ -1,0 +1,37 @@
+#! /bin/sh
+#!/usr/bin/env bash
+NAME=${1?Error: no name given}
+NAME2=${2?Error: no name given}
+NAME3=${3?Error: no name given}
+./verilog-parser $NAME $NAME2 $NAME3 \
+&& python to_cnf.py \
+
+VAR1="final_cnf"
+VAR2=0
+VAR3=1
+VAR4=0
+VAR5="write_output"
+VAR6=".txt"
+while [ -f "$VAR1$VAR2" ]
+do
+    ./zchaff "$VAR1$VAR2" 1800 input_name
+    str=$?
+    if [ $str == "1" ];then
+    	VAR4=1
+    	break
+    fi
+    VAR2=$(( $VAR2 + $VAR3 ))
+done
+
+if [ $VAR4 == "0" ];then
+	echo EQ
+fi
+VAR1="final_cnf"
+VAR2=0
+VAR3=1
+while [ -f "$VAR1$VAR2" ]
+do
+    rm -rf "$VAR1$VAR2"
+    rm -rf "$VAR5$VAR2$VAR6"
+    VAR2=$(( $VAR2 + $VAR3 ))
+done

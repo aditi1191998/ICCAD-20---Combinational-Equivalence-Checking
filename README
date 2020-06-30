@@ -1,0 +1,13 @@
+ A combinational equivalence checker which considers "Dont Care(X)" conditions as well.
+
+  How to run the program?
+  ------------------
+  Put the verilog files to be compared in the directory.
+  cd Final_CEC_Ex
+  bash ./cada0080 <filename_1> <filename_2> input_name
+  
+  
+  For further information, contact:
+  --------
+  Aditi Rakesh Singh
+  aditirsingh9@gmail.com
